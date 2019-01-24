@@ -78,5 +78,5 @@ mod_wsgi-express module-config > /etc/httpd/conf.modules.d/02-wsgi.conf
 
 service httpd start
 
-echo "Visit http://localhost:8081/rest/v1 in your browser"
+echo "Visit http://localhost:8081/fake_enrichment/rest/v1 in your browser"
 
