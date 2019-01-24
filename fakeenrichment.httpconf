@@ -2,9 +2,9 @@
     ServerName localhost
 
     WSGIDaemonProcess fake_enrichment user=apache group=apache threads=5
-    WSGIScriptAlias /fake/v1 /var/www/fake_enrichment/fake_enrichment.wsgi
+    WSGIScriptAlias /fake_enrichment/v1 /var/www/fake_enrichment_rest/fake_enrichment.wsgi
 
-    <Directory /var/www/fake_enrichment>
+    <Directory /var/www/fake_enrichment_rest>
         WSGIProcessGroup fake_enrichment
         WSGIApplicationGroup %{GLOBAL}
         Require all granted

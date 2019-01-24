@@ -48,23 +48,23 @@ pushd fake_enrichment
 make dist
 pip install dist/fake_enrich*whl
 # copy the http configuration file
-cp fakeenrich.httpconf /etc/httpd/conf.d/fakeenrich.conf
+cp fakeenrichment.httpconf /etc/httpd/conf.d/fake_enrichment.conf
 popd
 
 mkdir /var/www/fake_enrichment_rest
 
 # write the WSGI file
-cat <<EOF > /var/www/fake_enrichment_rest/fakeenrich.wsgi
+cat <<EOF > /var/www/fake_enrichment_rest/fake_enrichment.wsgi
 #!/usr/bin/env python
 
 import os
-os.environ['ENRICH_REST_SETTINGS']="/var/www/fake_enrichment_rest/fakeenrich.cfg"
+os.environ['ENRICH_REST_SETTINGS']="/var/www/fake_enrichment_rest/fake_enrichment.cfg"
 
 from fake_enrichment import app as application
 EOF
 
 # write the configuration file
-cat <<EOF > /var/www/fake_enrichment_rest/fakeenrich.cfg
+cat <<EOF > /var/www/fake_enrichment_rest/fake_enrichment.cfg
 WAIT_COUNT=600
 SLEEP_TIME=1
 EOF
