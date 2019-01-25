@@ -20,8 +20,10 @@ with open(os.path.join('fake_enrichment', '__init__.py')) as ver_file:
 
 requirements = [
     'argparse',
+    'tzlocal',
     'flask',
-    'flask-restplus'
+    'flask-restplus',
+    'Flask-Limiter'
 ]
 
 setup_requirements = [ ]
