@@ -37,10 +37,12 @@ app = Flask(__name__)
 JOB_PATH_KEY = 'JOB_PATH'
 WAIT_COUNT_KEY = 'WAIT_COUNT'
 SLEEP_TIME_KEY = 'SLEEP_TIME'
+DEFAULT_RATE_LIMIT_KEY = 'DEFAULT_RATE_LIMIT'
 
 app.config[JOB_PATH_KEY] = '/tmp'
 app.config[WAIT_COUNT_KEY] = 60
 app.config[SLEEP_TIME_KEY] = 10
+app.config[DEFAULT_RATE_LIMIT_KEY] = '1 per second'
 
 app.config.from_envvar(ENRICH_REST_SETTINGS_ENV, silent=True)
 
@@ -55,7 +57,7 @@ api = Api(app, version=str(__version__),
 limiter = Limiter(
     app,
     key_func=get_remote_address,
-    default_limits=["60 per hour"],
+    default_limits=[app.config[DEFAULT_RATE_LIMIT_KEY]],
     headers_enabled=True
 )
 for handler in app.logger.handlers:
@@ -447,6 +449,38 @@ class GetEnrichmentDatabases(Resource):
         return marshal(dr, GetEnrichmentDatabases.dblist), dr.status_code
 
 
+class ServerStatus(object):
+    """Represents status of server
+    """
+    status = 'ok'
+    message = ''
+    pcdiskfull = 0
+    load = [0,0,0]
+    queries = [0,0,0,0,0]
+    rest_version = __version__
+
+    def __init__(self):
+        """Constructor
+        """
+
+        self.pcdiskfull = random.randint(0, 100)
+        if self.pcdiskfull is 100:
+            self.status = 'error'
+            self.message = 'Disk is full'
+        else:
+            self.status = random.choice(['ok', 'error'])
+
+        self.load[0] = random.random()*10.0
+        self.load[1] = random.random()*10.0
+        self.load[2] = random.random()*10.0
+
+        self.queries[0] = random.randint(0, 500)
+        self.queries[1] = self.queries[0] + random.randint(0, 500)
+        self.queries[2] = self.queries[1] + random.randint(0, 500)
+        self.queries[3] = self.queries[2] + random.randint(0, 500)
+        self.queries[4] = self.queries[3] + random.randint(0, 500)
+
+
 @ns.route('/status', strict_slashes=False)
 class SystemStatus(Resource):
 
@@ -454,6 +488,15 @@ class SystemStatus(Resource):
 
     statusobj = api.model('StatusSchema', {
         'status': fields.String(description='ok|error'),
+        'pcdiskfull': fields.Integer(description='How full disk is in %'),
+        'load': fields.List(fields.Float(description='server load'),
+                            description='List of 3 floats containing 1 minute,'
+                                        ' 5 minute, 15minute load'),
+        'queries': fields.List(fields.Integer(description='Number of queries'),
+                               description='List of 5 integers containing # '
+                                           'queries in last minute, 5 '
+                                           'minutes, 15 minutes, hour, 24 '
+                                           'hours'),
         'rest_version': fields.String(description='Version of REST service')
     })
     @api.doc('Gets status')
@@ -465,12 +508,13 @@ class SystemStatus(Resource):
         Gets status of service
 
         """
-        try:
-            pc_disk_full = 50
-        except Exception:
-            app.logger.exception('Caught exception checking disk space')
-            pc_disk_full = -1
+        s_code = random.choice([200, 500])
 
-        resp = jsonify({'error': 'error'})
-        resp.status_code = 200
-        return resp
+        if s_code is 500:
+            er = ErrorResponse()
+            er.message = 'Internal server error'
+            er.description = 'something good'
+            return marshal(er, ERROR_RESP), s_code
+
+        ss = ServerStatus()
+        return marshal(ss, SystemStatus.statusobj), s_code
