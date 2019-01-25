@@ -91,6 +91,8 @@ RATE_LIMIT_HEADERS = {
  'x-ratelimit-remaining': 'Number of requests remaining',
  'x-ratelimit-reset': 'Request rate limit reset time'
 }
+
+
 class ErrorResponse(object):
     """Error response
     """
@@ -137,6 +139,12 @@ class RunEnrichmentQuery(Resource):
         """
         Submits enrichment query
 
+        Payload in JSON will have genelist which is a list of genes and databaselist which is a list of networkset names corresponding to NDEx enrichment network sets. These networks must be normalized such that “n” is gene name, “r” is gene id and “a” is alternate ids
+        Initially only signor, PID, wikipathway are supported.
+
+
+        The service should upon post return 202 and set location to resource to poll for result. Which will
+        Match the URL of GET request below.
         """
         app.logger.debug("Post received")
 
@@ -215,6 +223,9 @@ class GetTaskStatus(Resource):
     def get(self, id):
         """
         Gets status of enrichment query
+
+        This lets caller get status without getting the full result back
+
         """
         bs = BaseStatus(id)
         if bs.status is 'failed':
@@ -363,14 +374,13 @@ class GetEnrichmentResultAsCX(Resource):
     @api.response(200, 'Successful response from server and response will be CX')
     @api.response(410, 'Task not found')
     @api.response(429, 'Too many requests', TOO_MANY_REQUESTS)
-    @api.response(500, 'Internal server error', ERROR_RESP)
+    @api.response(500, 'Internal server error, or task not completed?', ERROR_RESP)
     @api.expect(get_params)
     def get(self, id):
         """
         Gets result of enrichment from a specific database and network as CX
 
-        NOTE: For incomplete/failed jobs only Status, message, progress, and walltime will
-        be returned in JSON
+        NOTE: For incomplete/failed 500 will be returned
         """
         s_code = random.choice([200, 410, 500])
 
@@ -436,6 +446,10 @@ class GetEnrichmentDatabases(Resource):
     def get(self):
         """
         Gets list of databases that can be queried for enrichment
+
+        Result in JSON which is a list of objects with uuid and display
+        name for database that can be queried.
+
 
         """
         dr = DatabaseResults()
