@@ -6,15 +6,23 @@ __author__ = """Chris Churas"""
 __email__ = 'churas.camera@gmail.com'
 __version__ = '0.0.1'
 
+from datetime import datetime
+
 import random
 import os
 import uuid
 import flask
 from flask import Flask, jsonify, request
-from flask_restplus import reqparse, abort, Api, Resource, fields, marshal
+from flask_restplus import reqparse, Api, Resource, fields, marshal
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
 
 
 desc = """Fake enrichment service
+ 
+ # THIS IS A FAKE SERVICE WITH RANDOM RESULTS YOU HAVE BEEN WARNED!!!!!
+
  
  **NOTE:** This service is experimental. The interface is subject to change.
  
@@ -53,9 +61,35 @@ ns = api.namespace(ENRICH_NS,
 
 app.config.SWAGGER_UI_DOC_EXPANSION = 'list'
 
-
-
 FAKE_CX = [{'numberVerification': [{'longNumber': 281474976710655}]}, {'metaData': [{'consistencyGroup': 1, 'elementCount': 1, 'lastUpdate': 1504297829644, 'name': 'ndexStatus', 'properties': [], 'version': '1.0'}, {'consistencyGroup': 1, 'elementCount': 1, 'lastUpdate': 1504297829657, 'name': 'provenanceHistory', 'properties': [], 'version': '1.0'}, {'consistencyGroup': 1, 'elementCount': 2, 'idCounter': 5, 'name': 'nodes'}, {'consistencyGroup': 1, 'elementCount': 1, 'idCounter': 5, 'name': 'edges'}, {'consistencyGroup': 1, 'elementCount': 1, 'idCounter': 5, 'name': 'supports'}, {'consistencyGroup': 1, 'elementCount': 1, 'idCounter': 5, 'name': 'citations'}, {'consistencyGroup': 1, 'elementCount': 9, 'idCounter': 5, 'name': 'edgeAttributes'}, {'consistencyGroup': 1, 'elementCount': 1, 'idCounter': 5, 'name': 'edgeSupports'}, {'consistencyGroup': 1, 'elementCount': 2, 'idCounter': 5, 'name': 'networkAttributes'}, {'consistencyGroup': 1, 'elementCount': 4, 'idCounter': 5, 'name': 'nodeAttributes'}]}, {'ndexStatus': [{'externalId': '653a65b2-8f54-11e7-a10d-0ac135e8bacf', 'creationTime': 1504297829644, 'modificationTime': 1504297829644, 'visibility': 'PRIVATE', 'published': False, 'nodeCount': 2, 'edgeCount': 1, 'owner': 'bgyori', 'ndexServerURI': 'http://public.ndexbio.org', 'readOnly': False}]}, {'provenanceHistory': [{'entity': {'uri': 'http://public.ndexbio.org/v2/network/653a65b2-8f54-11e7-a10d-0ac135e8bacf/summary', 'creationEvent': {'startedAtTime': 1504297829644, 'endedAtTime': 1504297829644, 'eventType': 'Program Upload in CX', 'inputs': None, 'properties': [{'name': 'user', 'value': 'Benjamin Gyori'}, {'name': 'user name', 'value': 'bgyori'}]}, 'properties': [{'name': 'edge count', 'value': '1'}, {'name': 'node count', 'value': '2'}, {'name': 'dc:title', 'value': 'indra_assembled'}]}}]}, {'nodes': [{'@id': 0, 'n': 'MEK'}, {'@id': 1, 'n': 'ERK'}]}, {'edges': [{'@id': 2, 's': 0, 't': 1, 'i': 'Phosphorylation'}]}, {'supports': [{'text': 'MEK phosphorylates ERK', 'citation': None, '@id': 4, 'attributes': []}]}, {'citations': [{'@id': 3, 'dc:title': None, 'dc:contributor': None, 'dc:identifier': 'pmid:19760502', 'dc:type': None, 'dc:description': None, 'attributes': []}]}, {'edgeAttributes': [{'po': 2, 'n': 'INDRA statement', 'v': 'Phosphorylation(MEK(), ERK())'}, {'po': 2, 'n': 'INDRA json', 'v': '{"type": "Phosphorylation", "enz": {"name": "MEK", "db_refs": {"BE": "MEK", "TEXT": "MEK"}, "sbo_definition": "http://identifiers.org/sbo/SBO:0000460"}, "sub": {"name": "ERK", "db_refs": {"BE": "ERK", "TEXT": "ERK"}, "sbo_definition": "http://identifiers.org/sbo/SBO:0000015"}, "evidence": [{"source_api": "reach", "pmid": "19760502", "text": "MEK phosphorylates ERK", "annotations": {"found_by": "Phosphorylation_syntax_1a_verb"}, "epistemics": {"section_type": null, "direct": true}}], "id": "364e57c7-9768-43ea-8ce8-cfd65212aff0", "sbo_definition": "http://identifiers.org/sbo/SBO:0000216"}'}, {'po': 2, 'n': 'type', 'v': 'Modification'}, {'po': 2, 'n': 'polarity', 'v': 'positive'}, {'po': 2, 'n': 'ndex:citation', 'v': ['pmid:19760502'], 'd': 'list_of_string'}, {'po': 2, 'n': 'Belief score', 'v': '1.00'}, {'po': 2, 'n': 'Text', 'v': 'MEK phosphorylates ERK'}, {'po': 2, 'n': 'indra', 'v': ''}, {'po': 2, 'n': 'supportType', 'v': 'literature'}]}, {'edgeSupports': [{'po': [2], 'supports': [4]}]}, {'networkAttributes': [{'n': 'name', 'v': 'indra_assembled'}, {'n': 'description', 'v': ''}]}, {'nodeAttributes': [{'po': 0, 'n': 'type', 'v': 'proteinfamily'}, {'po': 0, 'n': 'BE', 'v': 'http://sorger.med.harvard.edu/indra/entities/MEK'}, {'po': 1, 'n': 'type', 'v': 'proteinfamily'}, {'po': 1, 'n': 'BE', 'v': 'http://sorger.med.harvard.edu/indra/entities/ERK'}]}, {'status': [{'error': '', 'success': True}]}]
+
+ERROR_RESP = api.model('ErrorResponseSchema', {
+    'errorCode': fields.String(description='Error code to help identify issue'),
+    'message': fields.String(description='Human readable description of error'),
+    'description': fields.String(description='More detailed description of error'),
+    'stackTrace': fields.String(description='stack trace of error'),
+    'threadId': fields.String(description='Id of thread running process'),
+    'timeStamp': fields.String(description='UTC Time stamp in YYYY-MM-DDTHH:MM.S')
+})
+
+
+class ErrorResponse(object):
+    """Error response
+    """
+    errorCode = ''
+    message = ''
+    description = ''
+    stackTrace = ''
+    threadId = ''
+    timeStamp = ''
+
+    def __init__(self):
+        """
+        Constructor
+        """
+        dt = datetime.utcnow()
+        self.timeStamp = dt.strftime('%Y-%m-%dT%H:%M.%s')
+
 
 @api.doc('Runs enrichment query')
 @ns.route('/', strict_slashes=False)
@@ -72,16 +106,12 @@ class RunEnrichmentQuery(Resource):
                                     example=['signor', 'pid'], default=['signor'])
     })
 
-    @api.doc('Runs enrichment query',
-             responses={
-                 202: 'The task was successfully submitted to the service. '
-                      'Visit the URL'
-                      ' specified in **Location** field in HEADERS to '
-                      'status and results',
-                 500: 'Internal server error'
-             })
-    @api.header(LOCATION, 'URL endpoint to poll for result of task for '
-                          'successful call')
+    @api.doc('Runs enrichment query')
+    @api.response(202, 'The task was successfully submitted to the service. '
+                       'Visit the URL'
+                       ' specified in **Location** field in HEADERS to '
+                       'status and results')
+    @api.response(500, 'Internal server error', ERROR_RESP)
     @api.expect(resource_fields)
     def post(self):
         """
@@ -91,7 +121,7 @@ class RunEnrichmentQuery(Resource):
         app.logger.debug("Post received")
 
         try:
-            if random.choice['success', 'fail'] is 'fail':
+            if random.choice(['success', 'fail']) is 'fail':
                 raise Exception('something failed')
 
             res = str(uuid.uuid4())
@@ -100,13 +130,13 @@ class RunEnrichmentQuery(Resource):
             resp.headers[LOCATION] = ENRICH_NS + '/' + res
             resp.status_code = 202
             return resp
-        except OSError as e:
-            app.logger.exception('Error creating task due to OSError' + str(e))
-            abort(500, 'Unable to create task ' + str(e))
         except Exception as ea:
             app.logger.exception('Error creating task due to Exception ' +
                                  str(ea))
-            abort(500, 'Unable to create task ' + str(ea))
+            er = ErrorResponse()
+            er.message = 'Error creating task due to Exception'
+            er.description = str(ea)
+            return marshal(er, ERROR_RESP), 500
 
 
 BASE_STATUS = {'status': fields.String(description='One of the following <submitted | processing | complete | failed>',
@@ -160,17 +190,19 @@ class GetTaskStatus(Resource):
 
     @api.response(200, 'Success', task_status_resp)
     @api.response(410, 'Task not found')
-    @api.response(500, 'Internal server error')
+    @api.response(500, 'Internal server error', ERROR_RESP)
     def get(self, id):
         """
         Gets status of enrichment query
         """
         bs = BaseStatus(id)
-        s_code = 200
         if bs.status is 'failed':
-            s_code = 500
+            er = ErrorResponse()
+            er.message = 'There was some error'
+            er.description = 'more detailed error heehe'
+            return marshal(er, ERROR_RESP), 500
 
-        return marshal(bs, GetTaskStatus.task_status_resp), s_code
+        return marshal(bs, GetTaskStatus.task_status_resp), 200
 
 
 FULL_STATUS = BASE_STATUS
@@ -251,7 +283,7 @@ class GetEnrichmentQueryResult(Resource):
 
     @api.response(200, 'Successful response from server', fulltask_status_resp)
     @api.response(410, 'Task not found')
-    @api.response(500, 'Internal server error')
+    @api.response(500, 'Internal server error', ERROR_RESP)
     @api.expect(get_params)
     def get(self, id):
         """
@@ -262,34 +294,43 @@ class GetEnrichmentQueryResult(Resource):
         """
         params = GetEnrichmentQueryResult.get_params.parse_args(request, strict=True)
         fs = FullResult(id, params['start'], params['size'])
-        s_code = 200
         if fs.status is 'failed':
-            s_code = 500
+            er = ErrorResponse()
+            er.message = fs.message
+            er.description = 'more detailed error heehe'
+            return marshal(er, ERROR_RESP), 500
 
-        return marshal(fs, GetEnrichmentQueryResult.fulltask_status_resp), s_code
+        return marshal(fs, GetEnrichmentQueryResult.fulltask_status_resp), 200
 
-    @api.doc('Creates request to delete query',
-             responses={
-                 200: 'Delete request successfully received',
-                 400: 'Invalid delete request',
-                 500: 'Internal server error'
-             })
+    @api.doc('Creates request to delete query')
+    @api.response(200, 'Delete request successfully received')
+    @api.response(400, 'Invalid delete request', ERROR_RESP)
+    @api.response(500, 'Internal server error', ERROR_RESP)
     def delete(self, id):
         """
         Deletes task associated with {id} passed in
         """
-        resp = flask.make_response()
-        resp.status_code = random.choice[200, 400, 500]
-        return resp
+        s = random.choice([200, 400, 500])
+        if s is 200:
+            resp = flask.make_response()
+            resp.status_code = s
+            return resp
+
+        er = ErrorResponse()
+        if s is 400:
+            er.message = 'Invalid request somehow'
+            er.description = 'hi'
+        if s is 500:
+            er.message = 'some server error'
+            er.description = 'hi there'
+
+        return marshal(er, ERROR_RESP), s
 
 
 @ns.route('/<string:id>/overlaynetwork', strict_slashes=False)
 class GetEnrichmentResultAsCX(Resource):
     """Gets result of query overlayed on network as CX
     """
-
-
-
     get_params = reqparse.RequestParser()
     get_params.add_argument('databaseid', type=str, location='args',
                             help='UUID of database', required=True)
@@ -298,7 +339,7 @@ class GetEnrichmentResultAsCX(Resource):
 
     @api.response(200, 'Successful response from server and response will be CX')
     @api.response(410, 'Task not found')
-    @api.response(500, 'Internal server error')
+    @api.response(500, 'Internal server error', ERROR_RESP)
     @api.expect(get_params)
     def get(self, id):
         """
@@ -309,46 +350,78 @@ class GetEnrichmentResultAsCX(Resource):
         """
         s_code = random.choice([200, 410, 500])
 
-        if s_code is not 200:
+        if s_code is 410:
             resp = flask.make_response()
             resp.status_code = s_code
             return resp
+
+        if s_code is 500:
+            er = ErrorResponse()
+            er.message = 'Internal server error'
+            er.description = 'something good'
+            return marshal(er, ERROR_RESP), s_code
 
         resp = jsonify(FAKE_CX)
         resp.status_code = 200
         return resp
 
 
+class DatabaseResults(object):
+    """
+    database results
+    """
+    results = []
+    status_code = 200
+
+    def __init__(self):
+        """
+        Constructor
+        """
+        self.status_code = random.choice([200, 500])
+        if self.status_code is 500:
+            return
+        self.results = []
+        self.results.append({'uuid': '89a90a24-2fa8-4a57-ae4b-7c30a180e8e6',
+                            'description': 'The SIGnaling Network Open Resource organizes and stores signaling information published in the scientific literature in a structured format. The core of this project is a collection of more than 11000',
+                            'name': 'signor',
+                            'number_of_networks': 48})
+
+        self.results.append({'uuid': 'e508cf31-79af-463e-b8b6-ff34c87e1734',
+                             'description': 'BioGRID is an online interaction repository with data compiled through comprehensive curation efforts. All interaction data are freely provided through their search index and available via download in a wide variety of standardized formats. This account is maintained by the NDEx Team and updated monthly with the latest released data.',
+                             'name': 'biogrid',
+                             'number_of_networks': 14})
+
+
 @ns.route('/database', strict_slashes=False)
 class GetEnrichmentDatabases(Resource):
 
-    @api.doc('Gets ',
-             responses={
-                 200: 'Success',
-                 410: 'Task not found',
-                 500: 'Internal server error'
-             })
+    dbres = api.model('DatabaseResult', {
+        'uuid': fields.String(description='UUID of database'),
+        'description': fields.String(description='Description of database'),
+        'name': fields.String(description='Name of database'),
+        'number_of_networks': fields.Integer(description='Number of networks in database')
+    })
+    dblist = api.model('DatabaseResults', {
+        'results': fields.List(fields.Nested(dbres)),
+    })
+
+    @api.doc('Gets ')
+    @api.response(200, 'Success', dblist)
+    @api.response(500, 'Internal server error', ERROR_RESP)
     def get(self):
         """
         Gets list of databases that can be queried for enrichment
 
-        &nbsp;&nbsp;
-
-        ```Bash
-        {[
-            {
-                “uuid”: <uuid of network>,
-                “description”: <description of database>,
-                “name”: <name of networkset or database>,
-                “number_of_networks”: <number of networks>,
-             },
-        ]}
-        ```
         """
-        resp = jsonify({'error': 'error'})
+        dr = DatabaseResults()
 
-        resp.status_code = 500
-        return resp
+        if dr.status_code is 500:
+            er = ErrorResponse()
+            er.message = 'Internal server error'
+            er.description = 'something good'
+            return marshal(er, ERROR_RESP), dr.status_code
+
+        return marshal(dr, GetEnrichmentDatabases.dblist), dr.status_code
 
 
 @ns.route('/status', strict_slashes=False)
@@ -356,22 +429,21 @@ class SystemStatus(Resource):
 
     OK_STATUS = 'ok'
 
+    statusobj = api.model('StatusSchema', {
+        'status': fields.String(description='ok|error'),
+        'rest_version': fields.String(description='Version of REST service')
+    })
     @api.doc('Gets status',
              responses={
                  200: 'Success',
                  500: 'Internal server error'
              })
+    @api.response(200, 'Success', statusobj)
+    @api.response(500, 'Internal server error', ERROR_RESP)
     def get(self):
         """
         Gets status of service
 
-        ```Bash
-        {
-          "status" : "ok|error",
-          "rest_version": "1.0",
-          "percent_disk_full": "45"
-        }
-        ```
         """
         try:
             pc_disk_full = 50
