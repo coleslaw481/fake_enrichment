@@ -42,7 +42,7 @@ DEFAULT_RATE_LIMIT_KEY = 'DEFAULT_RATE_LIMIT'
 app.config[JOB_PATH_KEY] = '/tmp'
 app.config[WAIT_COUNT_KEY] = 60
 app.config[SLEEP_TIME_KEY] = 10
-app.config[DEFAULT_RATE_LIMIT_KEY] = '1 per second'
+app.config[DEFAULT_RATE_LIMIT_KEY] = '360 per hour'
 
 app.config.from_envvar(ENRICH_REST_SETTINGS_ENV, silent=True)
 
